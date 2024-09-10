@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全景图片展示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            animation: zoomAndSlide 15s linear infinite;
+        }
+
+        @keyframes zoomAndSlide {
+            0% {
+                transform: scale(1.5) translateX(0);
+                opacity: 1;
+            }
+            20% {
+                transform: scale(1) translateX(0);
+            }
+            80% {
+                transform: scale(1) translateX(-100%);
+            }
+            100% {
+                transform: scale(1) translateX(-100%);
+                opacity: 0;
+            }
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            z-index: 10;
+        }
+
+        button {
+            background-color: #007BFF;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.1);
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="image-container" id="imageContainer">
+            <!-- 生成图片元素 -->
+            <img src="p1.jpg" alt="全景图片">
+            <img src="p2.jpg" alt="全景图片">
+            <img src="p3.jpg" alt="全景图片">
+            <img src="p4.jpg" alt="全景图片">
+            <img src="p5.jpg" alt="全景图片">
+            <img src="p6.jpg" alt="全景图片">
+            <img src="p7.jpg" alt="全景图片">
+            <img src="p8.jpg" alt="全景图片">
+            <img src="p9.jpg" alt="全景图片">
+        </div>
+        <div class="controls">
+            <button id="pauseButton">暂停</button>
+            <button id="playButton">播放</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const imageContainer = document.getElementById('imageContainer');
+            const pauseButton = document.getElementById('pauseButton');
+            const playButton = document.getElementById('playButton');
+            const images = document.querySelectorAll('.image-container img');
+            let currentIndex = 0;
+
+            // Function to update the animation for the current image
+            function updateImage() {
+                images.forEach((img, index) => {
+                    img.style.display = index === currentIndex ? 'block' : 'none';
+                });
+            }
+
+            // Pause the animation
+            pauseButton.addEventListener('click', () => {
+                images[currentIndex].style.animationPlayState = 'paused';
+                pauseButton.disabled = true;
+                playButton.disabled = false;
+            });
+
+            // Play the animation
+            playButton.addEventListener('click', () => {
+                images[currentIndex].style.animationPlayState = 'running';
+                pauseButton.disabled = false;
+                playButton.disabled = true;
+            });
+
+            // Initialize button states
+            pauseButton.disabled = false;
+            playButton.disabled = true;
+
+            // Update the initial image
+            updateImage();
+
+            // Automatically switch to the next image every 15 seconds
+            setInterval(() => {
+                images[currentIndex].style.animationPlayState = 'paused';
+                currentIndex = (currentIndex + 1) % images.length;
+                updateImage();
+                images[currentIndex].style.animationPlayState = 'running';
+            }, 15000); // Duration should match the animation duration
+        });
+    </script>
+</body>
+</html>

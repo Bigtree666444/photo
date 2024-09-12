@@ -1,156 +1,227 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全景图片展示</title>
+    <title>360 Photo Viewer</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        .container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .image-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .image-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            animation: zoomAndSlide 15s linear infinite;
-        }
-
-        @keyframes zoomAndSlide {
-            0% {
-                transform: scale(1.5) translateX(0);
-                opacity: 1;
-            }
-            20% {
-                transform: scale(1) translateX(0);
-            }
-            80% {
-                transform: scale(1) translateX(-100%);
-            }
-            100% {
-                transform: scale(1) translateX(-100%);
-                opacity: 0;
-            }
-        }
-
-        .controls {
-            position: absolute;
-            bottom: 20px;
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        .navigation {
+            position: fixed;
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            display: flex;
-            z-index: 10;
+            z-index: 1;
         }
-
-        button {
-            background-color: #007BFF;
-            border: none;
-            color: white;
+        .navigation button {
+            margin: 0 5px;
             padding: 10px 20px;
-            margin: 0 10px;
-            border-radius: 5px;
-            cursor: pointer;
             font-size: 16px;
-            transition: background-color 0.3s ease, transform 0.3s ease;
         }
-
-        button:hover {
-            background-color: #0056b3;
-            transform: scale(1.1);
+        .hotspot {
+            position: absolute;
+            z-index: 2;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            cursor: pointer;
         }
-
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
+        .fade-in {
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+        .fade-in.show {
+            opacity: 1;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="image-container" id="imageContainer">
-            <!-- 生成图片元素 -->
-            <img src="p1.jpg" alt="全景图片">
-            <img src="p2.jpg" alt="全景图片">
-            <img src="p3.jpg" alt="全景图片">
-            <img src="p4.jpg" alt="全景图片">
-            <img src="p5.jpg" alt="全景图片">
-            <img src="p6.jpg" alt="全景图片">
-            <img src="p7.jpg" alt="全景图片">
-            <img src="p8.jpg" alt="全景图片">
-            <img src="p9.jpg" alt="全景图片">
-        </div>
-        <div class="controls">
-            <button id="pauseButton">暂停</button>
-            <button id="playButton">播放</button>
-        </div>
+    <div class="navigation">
+        <button onclick="navigatePhoto(-1)">Previous</button>
+        <button onclick="navigatePhoto(1)">Next</button>
     </div>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const imageContainer = document.getElementById('imageContainer');
-            const pauseButton = document.getElementById('pauseButton');
-            const playButton = document.getElementById('playButton');
-            const images = document.querySelectorAll('.image-container img');
-            let currentIndex = 0;
+        let scene, camera, renderer, sphere, controls;
+        let currentTexture, nextTexture;
+        let hotspotElements = [];
+        let currentPhotoIndex = 1;
+        const photoCount = 9;
 
-            // Function to update the animation for the current image
-            function updateImage() {
-                images.forEach((img, index) => {
-                    img.style.display = index === currentIndex ? 'block' : 'none';
+        const hotspotDefinitions = {
+            1: [{ position: { x: 200, y: 0, z: 300 }, nextPhoto: 2 }],
+            2: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 1 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 3 },
+            ],
+            3: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 2 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 4 },
+            ],
+            4: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 3 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 5 },
+            ],
+            5: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 4 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 6 },
+            ],
+            6: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 5 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 7 },
+            ],
+            7: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 6 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 8 },
+            ],
+            8: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 7 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 9 },
+            ],
+            9: [{ position: { x: -200, y: 0, z: -300 }, nextPhoto: 8 }]
+        };
+
+        init();
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Sphere setup
+            const geometry = new THREE.SphereGeometry(500, 60, 40);
+            geometry.scale(-1, 1, 1); // Invert the sphere
+
+            // Initial texture
+            currentTexture = new THREE.TextureLoader().load('p1.jpg', texture => {
+                console.log('Texture loaded successfully');
+                const material = new THREE.MeshBasicMaterial({ map: texture });
+                sphere = new THREE.Mesh(geometry, material);
+                scene.add(sphere);
+            });
+
+            // Lighting setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableZoom = false;
+            controls.enablePan = false;
+            controls.rotateSpeed = 0.5;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+
+            camera.position.set(0, 0, 0.1);
+
+            // Key event listeners for navigation
+            document.addEventListener('keydown', onDocumentKeyDown, false);
+
+            // Add fade-in effect
+            renderer.domElement.classList.add('fade-in');
+            setTimeout(() => {
+                renderer.domElement.classList.add('show');
+            }, 50);
+
+            // Animation loop
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function navigatePhoto(direction) {
+            const newPhotoIndex = (currentPhotoIndex - 1 + direction + photoCount) % photoCount + 1;
+            changePhoto(newPhotoIndex);
+        }
+
+        function changePhoto(photoIndex) {
+            if (photoIndex === currentPhotoIndex) return;
+
+            const photo = `p${photoIndex}.jpg`;
+            const newHotspots = hotspotDefinitions[photoIndex];
+
+            // Fade out effect
+            renderer.domElement.classList.remove('show');
+            setTimeout(() => {
+                if (sphere) {
+                    sphere.material.map.dispose(); // Clean up the old texture
+                }
+
+                currentTexture = new THREE.TextureLoader().load(photo, texture => {
+                    sphere.material.map = texture;
+                    sphere.material.needsUpdate = true;
+                    clearHotspots();
+                    addHotspots(newHotspots);
+
+                    // Fade in effect
+                    renderer.domElement.classList.add('show');
                 });
+
+                currentPhotoIndex = photoIndex;
+            }, 1000); // Duration of the fade-out effect
+        }
+
+        function addHotspots(newHotspots) {
+            newHotspots.forEach(hotspot => {
+                const hotspotElement = document.createElement('div');
+                hotspotElement.className = 'hotspot';
+                document.body.appendChild(hotspotElement);
+
+                const vector = new THREE.Vector3(hotspot.position.x, hotspot.position.y, hotspot.position.z);
+                vector.project(camera);
+                const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+                hotspotElement.style.left = `${x}px`;
+                hotspotElement.style.top = `${y}px`;
+
+                hotspotElement.addEventListener('click', () => {
+                    changePhoto(hotspot.nextPhoto);
+                });
+
+                hotspotElements.push(hotspotElement);
+            });
+        }
+
+        function clearHotspots() {
+            hotspotElements.forEach(element => {
+                if (document.body.contains(element)) {
+                    document.body.removeChild(element);
+                }
+            });
+            hotspotElements = [];
+        }
+
+        function onDocumentKeyDown(event) {
+            switch (event.key) {
+                case 'w':
+                case 'W':
+                    navigatePhoto(1);
+                    break;
+                case 's':
+                case 'S':
+                    navigatePhoto(-1);
+                    break;
             }
+        }
 
-            // Pause the animation
-            pauseButton.addEventListener('click', () => {
-                images[currentIndex].style.animationPlayState = 'paused';
-                pauseButton.disabled = true;
-                playButton.disabled = false;
-            });
-
-            // Play the animation
-            playButton.addEventListener('click', () => {
-                images[currentIndex].style.animationPlayState = 'running';
-                pauseButton.disabled = false;
-                playButton.disabled = true;
-            });
-
-            // Initialize button states
-            pauseButton.disabled = false;
-            playButton.disabled = true;
-
-            // Update the initial image
-            updateImage();
-
-            // Automatically switch to the next image every 15 seconds
-            setInterval(() => {
-                images[currentIndex].style.animationPlayState = 'paused';
-                currentIndex = (currentIndex + 1) % images.length;
-                updateImage();
-                images[currentIndex].style.animationPlayState = 'running';
-            }, 15000); // Duration should match the animation duration
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>

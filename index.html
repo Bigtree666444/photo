@@ -21,26 +21,18 @@
             padding: 10px 20px;
             font-size: 16px;
         }
-        .fade {
-            opacity: 0;
-            transition: opacity 1s ease-in-out;
-        }
-        .fade.show {
-            opacity: 1;
-        }
     </style>
 </head>
 <body>
     <div class="controls">
-        <button onclick="navigate(-1)">上一张</button>
-        <button onclick="navigate(1)">下一张</button>
+        <button onclick="startTransition()">开始展示</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         let scene, camera, renderer, sphere;
-        let currentTexture;
-        const photoCount = 9;
-        let currentPhotoIndex = 1;
+        let texture;
+        let transitionStartTime = 0;
+        const transitionDuration = 5000; // 过渡持续时间（毫秒）
 
         function init() {
             scene = new THREE.Scene();
@@ -52,21 +44,14 @@
             const geometry = new THREE.SphereGeometry(500, 60, 40);
             geometry.scale(-1, 1, 1); // Invert the sphere
 
-            const material = new THREE.MeshBasicMaterial({
-                map: new THREE.TextureLoader().load('p1.jpg', texture => {
-                    currentTexture = texture;
-                    sphere = new THREE.Mesh(geometry, material);
-                    scene.add(sphere);
-                })
-            });
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-            scene.add(ambientLight);
+            texture = new THREE.TextureLoader().load('p1.jpg'); // 初始图片
+            const material = new THREE.MeshBasicMaterial({ map: texture });
+            sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
 
             camera.position.set(0, 0, 0.1);
 
             window.addEventListener('resize', onWindowResize, false);
-            document.addEventListener('keydown', onDocumentKeyDown, false);
 
             animate();
         }
@@ -74,41 +59,30 @@
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
-        }
 
-        function navigate(direction) {
-            const newPhotoIndex = (currentPhotoIndex - 1 + direction + photoCount) % photoCount + 1;
-            changePhoto(newPhotoIndex);
-        }
-
-        function changePhoto(photoIndex) {
-            if (photoIndex === currentPhotoIndex) return;
-
-            const photo = `p${photoIndex}.jpg`;
-
-            const fadeElement = document.createElement('div');
-            fadeElement.className = 'fade';
-            document.body.appendChild(fadeElement);
-            fadeElement.classList.add('show');
-
-            setTimeout(() => {
-                currentTexture.dispose(); // Clean up the old texture
-                currentTexture = new THREE.TextureLoader().load(photo, texture => {
-                    sphere.material.map = texture;
-                    sphere.material.needsUpdate = true;
-                });
-
-                document.body.removeChild(fadeElement);
-                currentPhotoIndex = photoIndex;
-            }, 1000);
-        }
-
-        function onDocumentKeyDown(event) {
-            if (event.key === 'ArrowLeft') {
-                navigate(-1);
-            } else if (event.key === 'ArrowRight') {
-                navigate(1);
+            // Transition animation
+            if (transitionStartTime > 0) {
+                const elapsedTime = (Date.now() - transitionStartTime) / transitionDuration;
+                const t = Math.min(elapsedTime, 1);
+                updateCameraPosition(t);
+                if (t >= 1) {
+                    transitionStartTime = 0; // Stop the transition once completed
+                }
             }
+        }
+
+        function startTransition() {
+            transitionStartTime = Date.now();
+        }
+
+        function updateCameraPosition(t) {
+            // Example of transitioning from one point to another
+            // Adjust these values to fit the specific focus points in your images
+            const startPos = new THREE.Vector3(-500, 0, 500); // Starting point
+            const endPos = new THREE.Vector3(500, 0, -500); // Ending point
+
+            camera.position.lerpVectors(startPos, endPos, t);
+            camera.lookAt(0, 0, 0); // Look at the center of the sphere
         }
 
         function onWindowResize() {

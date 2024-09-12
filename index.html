@@ -3,106 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全景图片展示</title>
+    <title>360 Photo Viewer</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
-        .controls {
+        .navigation {
             position: fixed;
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 1;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
         }
-        .controls button {
+        .navigation button {
+            margin: 0 5px;
             padding: 10px 20px;
             font-size: 16px;
+        }
+        .hotspot {
+            position: absolute;
+            z-index: 2;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
             cursor: pointer;
         }
-        .fade {
+        .fade-in {
             opacity: 0;
-            transition: opacity 0.1s ease-in-out;
+            transition: opacity 1s ease-in-out;
         }
-        .fade.show {
+        .fade-in.show {
             opacity: 1;
         }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <button onclick="changePhoto(1)">图片 1</button>
-        <button onclick="changePhoto(2)">图片 2</button>
-        <button onclick="changePhoto(3)">图片 3</button>
-        <button onclick="changePhoto(4)">图片 4</button>
-        <button onclick="changePhoto(5)">图片 5</button>
-        <button onclick="changePhoto(6)">图片 6</button>
-        <button onclick="changePhoto(7)">图片 7</button>
-        <button onclick="changePhoto(8)">图片 8</button>
+    <div class="navigation">
+        <button onclick="changePhoto(1)">Photo 1</button>
+        <button onclick="changePhoto(2)">Photo 2</button>
+        <button onclick="changePhoto(3)">Photo 3</button>
+        <button onclick="changePhoto(4)">Photo 4</button>
+        <button onclick="changePhoto(5)">Photo 5</button>
+        <button onclick="changePhoto(6)">Photo 6</button>
+        <button onclick="changePhoto(7)">Photo 7</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-        let scene, camera, renderer, sphere, currentTexture;
-        let photoIndex = 1;
-        const totalPhotos = 8;
+        let scene, camera, renderer, sphere, controls;
+        let currentTexture;
+        let hotspotElements = [];
+        let currentPhotoIndex = 1;
+        const photoCount = 7;
+
+        const hotspotDefinitions = {
+            1: [
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 2 },
+            ],
+            2: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 1 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 3 },
+            ],
+            3: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 2 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 4 },
+            ],
+            4: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 3 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 5 },
+            ],
+            5: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 4 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 6 },
+            ],
+            6: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 5 },
+                { position: { x: 200, y: 0, z: 300 }, nextPhoto: 7 },
+            ],
+            7: [
+                { position: { x: -200, y: 0, z: -300 }, nextPhoto: 6 },
+            ]
+        };
+
+        init();
 
         function init() {
+            // Scene setup
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // Sphere setup
             const geometry = new THREE.SphereGeometry(500, 60, 40);
             geometry.scale(-1, 1, 1); // Invert the sphere
 
-            currentTexture = new THREE.TextureLoader().load('p1.jpg'); // Initial image
+            currentTexture = new THREE.TextureLoader().load('p1.jpg');
             const material = new THREE.MeshBasicMaterial({ map: currentTexture });
 
             sphere = new THREE.Mesh(geometry, material);
             scene.add(sphere);
 
+            // Lighting setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableZoom = false;
+            controls.enablePan = false;
+            controls.rotateSpeed = -0.25;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+
             camera.position.set(0, 0, 0.1);
 
-            window.addEventListener('resize', onWindowResize, false);
+            // Add initial hotspots
+            addHotspots(hotspotDefinitions[1]);
+
+            // Key event listeners for navigation
+            document.addEventListener('keydown', onDocumentKeyDown, false);
+
+            // Add fade-in effect
+            renderer.domElement.classList.add('fade-in');
+            setTimeout(() => {
+                renderer.domElement.classList.add('show');
+            }, 50);
+
+            // Animation loop
             animate();
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            controls.update();
             renderer.render(scene, camera);
         }
 
-        function changePhoto(index) {
-            if (index === photoIndex) return;
+        function changePhoto(photoIndex) {
+            currentPhotoIndex = photoIndex;
+            const photo = `p${photoIndex}.jpg`;
+            const newHotspots = hotspotDefinitions[photoIndex];
 
-            const photo = `p${index}.jpg`;
-            const fadeElement = document.createElement('div');
-            fadeElement.className = 'fade';
-            document.body.appendChild(fadeElement);
-            fadeElement.classList.add('show');
-
+            renderer.domElement.classList.remove('show'); // Start fade-out
             setTimeout(() => {
                 currentTexture.dispose(); // Clean up the old texture
-                currentTexture = new THREE.TextureLoader().load(photo, texture => {
-                    sphere.material.map = texture;
-                    sphere.material.needsUpdate = true;
-                });
+                currentTexture = new THREE.TextureLoader().load(photo);
+                sphere.material.map = currentTexture;
 
-                document.body.removeChild(fadeElement);
-                photoIndex = index;
-            }, 100); // Duration of the fade-out effect
+                clearHotspots();
+                addHotspots(newHotspots);
+
+                renderer.domElement.classList.add('show'); // Start fade-in
+            }, 1000); // Duration of the fade-out effect
         }
 
-        function onWindowResize() {
+        function addHotspots(newHotspots) {
+            newHotspots.forEach(hotspot => {
+                const hotspotElement = document.createElement('div');
+                hotspotElement.className = 'hotspot';
+                document.body.appendChild(hotspotElement);
+                const vector = new THREE.Vector3(hotspot.position.x, hotspot.position.y, hotspot.position.z);
+                vector.project(camera);
+                const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+                hotspotElement.style.left = `${x}px`;
+                hotspotElement.style.top = `${y}px`;
+
+                hotspotElement.addEventListener('click', () => {
+                    changePhoto(hotspot.nextPhoto);
+                });
+
+                hotspotElements.push(hotspotElement);
+            });
+        }
+
+        function clearHotspots() {
+            hotspotElements.forEach(element => {
+                document.body.removeChild(element);
+            });
+            hotspotElements = [];
+        }
+
+        function onDocumentKeyDown(event) {
+            switch (event.key) {
+                case 'w':
+                case 'W':
+                    navigateNext();
+                    break;
+                case 's':
+                case 'S':
+                    navigatePrevious();
+                    break;
+            }
+        }
+
+        function navigateNext() {
+            currentPhotoIndex = (currentPhotoIndex % photoCount) + 1;
+            changePhoto(currentPhotoIndex);
+        }
+
+        function navigatePrevious() {
+            currentPhotoIndex = (currentPhotoIndex - 2 + photoCount) % photoCount + 1;
+            changePhoto(currentPhotoIndex);
+        }
+
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        init();
+        });
     </script>
 </body>
 </html>

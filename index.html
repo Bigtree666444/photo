@@ -14,25 +14,39 @@
             transform: translateX(-50%);
             z-index: 1;
             display: flex;
-            justify-content: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
         .controls button {
             padding: 10px 20px;
             font-size: 16px;
+            cursor: pointer;
+        }
+        .fade {
+            opacity: 0;
+            transition: opacity 0.1s ease-in-out;
+        }
+        .fade.show {
+            opacity: 1;
         }
     </style>
 </head>
 <body>
     <div class="controls">
-        <button onclick="startTransition()">开始展示</button>
+        <button onclick="changePhoto(1)">图片 1</button>
+        <button onclick="changePhoto(2)">图片 2</button>
+        <button onclick="changePhoto(3)">图片 3</button>
+        <button onclick="changePhoto(4)">图片 4</button>
+        <button onclick="changePhoto(5)">图片 5</button>
+        <button onclick="changePhoto(6)">图片 6</button>
+        <button onclick="changePhoto(7)">图片 7</button>
+        <button onclick="changePhoto(8)">图片 8</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let scene, camera, renderer, sphere;
-        let texture;
-        let transitionStartTime = 0;
-        const transitionDuration = 5000; // 过渡持续时间（毫秒）
+        let scene, camera, renderer, sphere, currentTexture;
+        let photoIndex = 1;
+        const totalPhotos = 8;
 
         function init() {
             scene = new THREE.Scene();
@@ -44,45 +58,42 @@
             const geometry = new THREE.SphereGeometry(500, 60, 40);
             geometry.scale(-1, 1, 1); // Invert the sphere
 
-            texture = new THREE.TextureLoader().load('p1.jpg'); // 初始图片
-            const material = new THREE.MeshBasicMaterial({ map: texture });
+            currentTexture = new THREE.TextureLoader().load('p1.jpg'); // Initial image
+            const material = new THREE.MeshBasicMaterial({ map: currentTexture });
+
             sphere = new THREE.Mesh(geometry, material);
             scene.add(sphere);
 
             camera.position.set(0, 0, 0.1);
 
             window.addEventListener('resize', onWindowResize, false);
-
             animate();
         }
 
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
-
-            // Transition animation
-            if (transitionStartTime > 0) {
-                const elapsedTime = (Date.now() - transitionStartTime) / transitionDuration;
-                const t = Math.min(elapsedTime, 1);
-                updateCameraPosition(t);
-                if (t >= 1) {
-                    transitionStartTime = 0; // Stop the transition once completed
-                }
-            }
         }
 
-        function startTransition() {
-            transitionStartTime = Date.now();
-        }
+        function changePhoto(index) {
+            if (index === photoIndex) return;
 
-        function updateCameraPosition(t) {
-            // Example of transitioning from one point to another
-            // Adjust these values to fit the specific focus points in your images
-            const startPos = new THREE.Vector3(-500, 0, 500); // Starting point
-            const endPos = new THREE.Vector3(500, 0, -500); // Ending point
+            const photo = `p${index}.jpg`;
+            const fadeElement = document.createElement('div');
+            fadeElement.className = 'fade';
+            document.body.appendChild(fadeElement);
+            fadeElement.classList.add('show');
 
-            camera.position.lerpVectors(startPos, endPos, t);
-            camera.lookAt(0, 0, 0); // Look at the center of the sphere
+            setTimeout(() => {
+                currentTexture.dispose(); // Clean up the old texture
+                currentTexture = new THREE.TextureLoader().load(photo, texture => {
+                    sphere.material.map = texture;
+                    sphere.material.needsUpdate = true;
+                });
+
+                document.body.removeChild(fadeElement);
+                photoIndex = index;
+            }, 100); // Duration of the fade-out effect
         }
 
         function onWindowResize() {
